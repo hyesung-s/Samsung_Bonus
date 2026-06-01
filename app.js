@@ -673,7 +673,7 @@
         <div class="stat-label">${label}</div>
         <div class="stat-value">${value}</div>
       </div>
-    `)join("");
+    `).join("");
   }
 
   function metricRowHtml(metric, maxAbsValue, salary) {
