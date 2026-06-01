@@ -576,6 +576,7 @@
       },
       {
         label: "세후 최종 수령액",
+        ratio: formatPercent((receipt.finalReceipt / Math.max(salary, 1)) * 100),
         html: finalReceiptHtml(result),
         sub: `현금 ${formatEok(Math.max(0, receipt.opi1Tax.netPayment))} + 주식 ${formatEok(receipt.stockGrant.closeValue)}(종가기준)`,
         primary: true,

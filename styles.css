@@ -319,7 +319,7 @@ select {
 }
 .primary-card { border-color: rgba(37,99,235,0.42); background: linear-gradient(180deg, #fff, #f8fbff); }
 .card-head {
-  display: flex;
+  display: grid;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
@@ -378,7 +378,7 @@ select {
 }
 .summary-card .money-pair > div {
   display: grid;
-  grid-template-columns: minmax(64px, auto) 1fr;
+  grid-template-columns: minmax(32px, auto) 1fr;
   align-items: baseline;
   column-gap: 10px;
   row-gap: 2px;
