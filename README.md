@@ -4,6 +4,8 @@
 
 정적 HTML/CSS/JavaScript만으로 동작하는 2026 삼성전자 성과급 시뮬레이터입니다. GitHub Pages에 그대로 업로드해 사용할 수 있습니다.
 
+https://hyesung-s.github.io/Samsung_Bonus/
+
 ## 포함 기능
 
 - 메모리, 파운드리, S.LSI, 공통 4개 조직 반영
