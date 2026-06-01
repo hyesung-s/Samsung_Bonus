@@ -305,9 +305,9 @@ select {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
-  overflow-x: auto;
+  overflow: visible;
   padding-bottom: 4px;
 }
 .summary-card {
@@ -318,6 +318,11 @@ select {
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
 }
 .primary-card { border-color: rgba(37,99,235,0.42); background: linear-gradient(180deg, #fff, #f8fbff); }
+.monthly-net-card {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(180deg, #fff, #f7fffb);
+}
+
 .card-head {
   display: flex;
   justify-content: space-between;
@@ -572,7 +577,7 @@ select {
   .section-title-row, .block-title-row { flex-direction: column; gap: 6px; }
   .personal-grid, .opi-grid, .stock-input-grid { grid-template-columns: 1fr; }
   .fund-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .summary-grid { grid-template-columns: repeat(7, minmax(150px, 1fr)); }
+  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .division-grid { grid-template-columns: repeat(4, minmax(250px, 1fr)); }
   .opi2-stock-money-pair, .final-receipt-pair { grid-template-columns: 1fr; }
   .assumption-table th, .assumption-table td { padding: 7px 5px; }

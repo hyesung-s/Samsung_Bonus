@@ -18,7 +18,7 @@
   const HEALTH_INSURANCE_RATE = 0.03595;
   const LONG_TERM_CARE_RATE = 0.1314;
   const EMPLOYMENT_INSURANCE_RATE = 0.009;
-  const STORAGE_KEY = "samsung-bonus-calculator-state-v19-monthly-net";
+  const STORAGE_KEY = "samsung-bonus-calculator-state-v22-myresult-monthly-net";
   const SAMPSUNG_URL = "https://sampsung.vercel.app/";
   const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/005930.KS?range=10d&interval=1d";
 
@@ -601,11 +601,6 @@
         sub: "세금 계산의 기준 소득으로 사용",
       },
       {
-        label: "내년도 월별 실수령액",
-        html: `<div class="single-money">${formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet)}</div>`,
-        sub: `연간 ${formatManwonFromWon(receipt.monthlyTakeHome.annualNet)} · 월 공제 ${formatManwonFromWon(receipt.monthlyTakeHome.monthlyDeductions)}`,
-      },
-      {
         label: "OPI1 현금",
         ratio: formatPercent((selected.opi1 / Math.max(salary, 1)) * 100),
         html: moneyPairHtml(selected.opi1, receipt.opi1Tax.netPayment),
@@ -629,10 +624,16 @@
         sub: `현금 ${formatEok(Math.max(0, receipt.opi1Tax.netPayment))} + 주식 ${formatEok(receipt.stockGrant.closeValue)}(종가기준)`,
         primary: true,
       },
+      {
+        label: "내년도 월별 실수령액",
+        html: `<div class="single-money">${formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet)}</div>`,
+        sub: `연간 실수령 ${formatManwonFromWon(receipt.monthlyTakeHome.annualNet)} · 월 공제 ${formatManwonFromWon(receipt.monthlyTakeHome.monthlyDeductions)}`,
+        cardClass: "monthly-net-card",
+      },
     ];
 
     elements.summaryCards.innerHTML = cardData.map((card) => `
-      <article class="summary-card ${card.primary ? "primary-card" : ""}">
+      <article class="summary-card ${card.primary ? "primary-card" : ""} ${card.cardClass || ""}">
         <div class="card-head">
           <span class="label">${card.label}</span>
           ${card.ratio ? `<span class="ratio-chip">연봉 대비 ${card.ratio}</span>` : ""}
