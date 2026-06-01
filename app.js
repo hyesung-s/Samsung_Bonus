@@ -16,7 +16,9 @@
   const LOCAL_INCOME_TAX_RATE = 0.1;
   const NATIONAL_PENSION_RATE = 0.0475;
   const HEALTH_INSURANCE_RATE = 0.03595;
-  const STORAGE_KEY = "samsung-bonus-calculator-state-v18-insurance-fixed";
+  const LONG_TERM_CARE_RATE = 0.1314;
+  const EMPLOYMENT_INSURANCE_RATE = 0.009;
+  const STORAGE_KEY = "samsung-bonus-calculator-state-v19-monthly-net";
   const SAMPSUNG_URL = "https://sampsung.vercel.app/";
   const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/005930.KS?range=10d&interval=1d";
 
@@ -192,24 +194,33 @@
     };
   }
 
-  function calculateNextYearInsurance(totalGrossIncome) {
-    const base = Math.max(0, totalGrossIncome || 0);
-    const nationalPensionAnnual = base * NATIONAL_PENSION_RATE;
-    const healthInsuranceAnnual = base * HEALTH_INSURANCE_RATE;
+  function calculateNextYearMonthlyTakeHome(salary) {
+    const annualGross = Math.max(0, salary || 0);
+    const salaryTax = calculateTaxBundle(annualGross);
+    const healthInsuranceAnnual = annualGross * HEALTH_INSURANCE_RATE;
+    const longTermCareAnnual = healthInsuranceAnnual * LONG_TERM_CARE_RATE;
+    const nationalPensionAnnual = annualGross * NATIONAL_PENSION_RATE;
+    const employmentInsuranceAnnual = annualGross * EMPLOYMENT_INSURANCE_RATE;
+    const totalDeductions =
+      salaryTax.incomeTax +
+      salaryTax.localIncomeTax +
+      healthInsuranceAnnual +
+      longTermCareAnnual +
+      nationalPensionAnnual +
+      employmentInsuranceAnnual;
+    const annualNet = Math.max(0, annualGross - totalDeductions);
     return {
-      totalGrossIncome: base,
-      nationalPension: {
-        rate: NATIONAL_PENSION_RATE,
-        annual: nationalPensionAnnual,
-        monthly: nationalPensionAnnual / 12,
-      },
-      healthInsurance: {
-        rate: HEALTH_INSURANCE_RATE,
-        annual: healthInsuranceAnnual,
-        monthly: healthInsuranceAnnual / 12,
-      },
-      totalAnnual: nationalPensionAnnual + healthInsuranceAnnual,
-      totalMonthly: (nationalPensionAnnual + healthInsuranceAnnual) / 12,
+      annualGross,
+      earnedIncomeTax: salaryTax.incomeTax,
+      localIncomeTax: salaryTax.localIncomeTax,
+      healthInsuranceAnnual,
+      longTermCareAnnual,
+      nationalPensionAnnual,
+      employmentInsuranceAnnual,
+      totalDeductions,
+      monthlyDeductions: totalDeductions / 12,
+      annualNet,
+      monthlyNet: annualNet / 12,
     };
   }
 
@@ -250,11 +261,10 @@
       netPayment: divisionResult.totalBonus - opi1Tax.totalTax - opi2Tax.totalTax,
       effectiveRate: divisionResult.totalBonus > 0 ? ((opi1Tax.totalTax + opi2Tax.totalTax) / divisionResult.totalBonus) * 100 : 0,
     };
-    const totalGrossIncome = salary + Math.max(0, divisionResult.opi1) + Math.max(0, divisionResult.opi2Total);
-    const nextYearInsurance = calculateNextYearInsurance(totalGrossIncome);
+    const monthlyTakeHome = calculateNextYearMonthlyTakeHome(salary);
     const stockGrant = buildStockGrant(opi2Tax.netPayment, stockVwapPriceWon, stockClosePriceWon);
     const finalReceipt = Math.max(0, opi1Tax.netPayment) + stockGrant.closeValue;
-    return { opi1Tax, opi2Tax, totalBonusTax, stockGrant, finalReceipt, nextYearInsurance };
+    return { opi1Tax, opi2Tax, totalBonusTax, stockGrant, finalReceipt, monthlyTakeHome };
   }
 
   function calculate(input) {
@@ -591,6 +601,11 @@
         sub: "세금 계산의 기준 소득으로 사용",
       },
       {
+        label: "내년도 월별 실수령액",
+        html: `<div class="single-money">${formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet)}</div>`,
+        sub: `연간 ${formatManwonFromWon(receipt.monthlyTakeHome.annualNet)} · 월 공제 ${formatManwonFromWon(receipt.monthlyTakeHome.monthlyDeductions)}`,
+      },
+      {
         label: "OPI1 현금",
         ratio: formatPercent((selected.opi1 / Math.max(salary, 1)) * 100),
         html: moneyPairHtml(selected.opi1, receipt.opi1Tax.netPayment),
@@ -614,16 +629,6 @@
         sub: `현금 ${formatEok(Math.max(0, receipt.opi1Tax.netPayment))} + 주식 ${formatEok(receipt.stockGrant.closeValue)}(종가기준)`,
         primary: true,
       },
-      {
-        label: "내년도 국민연금",
-        html: insurancePairHtml(receipt.nextYearInsurance.nationalPension.annual, receipt.nextYearInsurance.nationalPension.monthly),
-        sub: `세전 총소득 ${formatEok(receipt.nextYearInsurance.totalGrossIncome)} × ${formatPercent(NATIONAL_PENSION_RATE * 100, 2)}`,
-      },
-      {
-        label: "내년도 건강보험",
-        html: insurancePairHtml(receipt.nextYearInsurance.healthInsurance.annual, receipt.nextYearInsurance.healthInsurance.monthly),
-        sub: `세전 총소득 ${formatEok(receipt.nextYearInsurance.totalGrossIncome)} × ${formatPercent(HEALTH_INSURANCE_RATE * 100, 3)}`,
-      },
     ];
 
     elements.summaryCards.innerHTML = cardData.map((card) => `
@@ -644,7 +649,7 @@
         OPI2 자사주는 1/3 즉시 매도 가능, 1/3 1년 뒤, 1/3 2년 뒤 매도 가능으로 나누며,
         나머지 주식은 2년 뒤 매도 가능 구간에 포함했습니다. 세후 최종 수령액은 OPI1 세후 현금과 최근 삼성전자 종가 기준 OPI2 자사주 평가액의 합계입니다.
         세후액은 근로소득공제·세액공제·비과세 항목을 반영하지 않은 간이 계산입니다.
-        내년도 국민연금과 건강보험은 세전 총소득을 연봉 + OPI1 + OPI2로 보고 각각 4.75%, 3.595%를 곱해 별도 산정했습니다.
+        내년도 월별 실수령액은 연봉에서 근로소득세, 지방소득세, 건강보험료, 장기요양료, 국민연금 보험료, 고용보험료를 차감해 12개월로 나눈 값입니다.
       `;
     }
   }
@@ -729,7 +734,7 @@
       <div class="metric-row ${metric.emphasis ? "emphasis" : ""}${metric.final ? " final" : ""}${negativeClass}">
         <div class="metric-line">
           <span>${metric.label}</span>
-          <strong>${formatEok(metric.value)}</strong>
+          <strong>${metric.display ?? formatEok(metric.value)}</strong>
           <em>${metric.percentText ?? formatPercent(percent)}</em>
         </div>
         ${metric.note ? `<p class="metric-note">${metric.note}</p>` : ""}
@@ -752,8 +757,7 @@
         item.totalBonus,
         receipt.totalBonusTax.netPayment,
         receipt.finalReceipt,
-        receipt.nextYearInsurance.nationalPension.annual,
-        receipt.nextYearInsurance.healthInsurance.annual,
+        receipt.monthlyTakeHome.monthlyNet,
       ];
     });
     const maxAbsValue = Math.max(...allMetrics.map((value) => Math.abs(value)), 1);
@@ -781,16 +785,11 @@
           note: `현금 ${formatEok(Math.max(0, receipt.opi1Tax.netPayment))} + 주식 ${formatEok(receipt.stockGrant.closeValue)}(종가기준)`,
         },
         {
-          label: "내년도 국민연금",
-          value: receipt.nextYearInsurance.nationalPension.annual,
-          percentText: `월 ${formatManwonFromWon(receipt.nextYearInsurance.nationalPension.monthly)}`,
-          note: `연간 ${formatEok(receipt.nextYearInsurance.nationalPension.annual)} · 세전 총소득 ${formatEok(receipt.nextYearInsurance.totalGrossIncome)} × ${formatPercent(NATIONAL_PENSION_RATE * 100, 2)}`,
-        },
-        {
-          label: "내년도 건강보험",
-          value: receipt.nextYearInsurance.healthInsurance.annual,
-          percentText: `월 ${formatManwonFromWon(receipt.nextYearInsurance.healthInsurance.monthly)}`,
-          note: `연간 ${formatEok(receipt.nextYearInsurance.healthInsurance.annual)} · 세전 총소득 ${formatEok(receipt.nextYearInsurance.totalGrossIncome)} × ${formatPercent(HEALTH_INSURANCE_RATE * 100, 3)}`,
+          label: "내년도 월별 실수령액",
+          value: receipt.monthlyTakeHome.monthlyNet,
+          display: formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet),
+          percentText: `연간 ${formatManwonFromWon(receipt.monthlyTakeHome.annualNet)}`,
+          note: `월 공제 ${formatManwonFromWon(receipt.monthlyTakeHome.monthlyDeductions)} · 근로소득세/지방소득세/4대보험 반영`,
         },
       ];
 
