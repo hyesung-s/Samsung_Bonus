@@ -9,7 +9,7 @@ const BUSINESS_DIVISION_IDS = ["memory", "foundry", "slsi"];
 const ALL_DIVISION_IDS = ["memory", "common", "foundry", "slsi"];
 const JO_WON = 1_000_000_000_000;
 const MAN_WON = 10_000;
-const STORAGE_KEY = "samsung-bonus-calculator-state-v1";
+const STORAGE_KEY = "samsung-bonus-calculator-state-v2";
 
 const DEFAULT_STATE = {
   userSalaryManwon: 8000,
@@ -31,7 +31,6 @@ const DEFAULT_STATE = {
 };
 
 let state = { ...DEFAULT_STATE };
-let lastChangedDistribution = "equal";
 
 const elements = {
   userSalaryManwon: document.getElementById("userSalaryManwon"),
@@ -60,6 +59,7 @@ const elements = {
   memoryFundText: document.getElementById("memoryFundText"),
   foundryFundText: document.getElementById("foundryFundText"),
   slsiFundText: document.getElementById("slsiFundText"),
+  commonSourceHelp: document.getElementById("commonSourceHelp"),
   shareButton: document.getElementById("shareButton"),
   resetButton: document.getElementById("resetButton"),
   toast: document.getElementById("toast"),
@@ -78,14 +78,19 @@ function formatInteger(value) {
   return Math.round(value).toLocaleString("ko-KR");
 }
 
+function formatDecimal(value, maxDigits = 2) {
+  return Number(value).toLocaleString("ko-KR", {
+    maximumFractionDigits: maxDigits,
+  });
+}
+
 function formatMoney(value) {
   if (!Number.isFinite(value)) return "-";
   const sign = value < 0 ? "-" : "";
   const abs = Math.abs(value);
 
   if (abs >= JO_WON) {
-    const jo = abs / JO_WON;
-    return `${sign}${formatDecimal(jo, 2)}조 원`;
+    return `${sign}${formatDecimal(abs / JO_WON, 2)}조 원`;
   }
 
   const eok = Math.floor(abs / 100_000_000);
@@ -97,10 +102,9 @@ function formatMoney(value) {
   return "0원";
 }
 
-function formatDecimal(value, maxDigits = 2) {
-  return Number(value).toLocaleString("ko-KR", {
-    maximumFractionDigits: maxDigits,
-  });
+function formatSalaryPercent(value, salary) {
+  if (!Number.isFinite(value) || !Number.isFinite(salary) || salary <= 0) return "연봉 대비 -";
+  return `연봉 대비 ${formatDecimal((value / salary) * 100, 1)}%`;
 }
 
 function getDivisionName(id) {
@@ -169,10 +173,6 @@ function paramsToState() {
     }
   });
 
-  if (!ALL_DIVISION_IDS.includes(parsed.userDivision)) parsed.userDivision = DEFAULT_STATE.userDivision;
-  if (!BUSINESS_DIVISION_IDS.includes(parsed.commonBusinessPoolSource)) {
-    parsed.commonBusinessPoolSource = DEFAULT_STATE.commonBusinessPoolSource;
-  }
   return sanitizeState(parsed);
 }
 
@@ -250,9 +250,9 @@ function calculate(input) {
   const salaryRatio = averageSalary > 0 ? salary / averageSalary : 0;
   const opi1Rate = input.opi1RatePercent / 100;
   const opi2FundingRate = input.opi2FundingRatePercent / 100;
-  const equalRate = input.equalDistributionRatePercent / 100;
+  const divisionRate = input.equalDistributionRatePercent / 100;
   const businessRate = input.businessDistributionRatePercent / 100;
-  const commonPayoutRate = input.commonPayoutRatePercent / 100;
+  const commonWeight = input.commonPayoutRatePercent / 100;
 
   const headcounts = {
     memory: input.memoryHeadcount,
@@ -272,15 +272,15 @@ function calculate(input) {
   );
 
   const totalOpi2Fund = BUSINESS_DIVISION_IDS.reduce((sum, id) => sum + opi2Funds[id], 0);
-  const equalPool = totalOpi2Fund * equalRate;
+  const divisionPool = totalOpi2Fund * divisionRate;
   const businessPools = Object.fromEntries(
     BUSINESS_DIVISION_IDS.map((id) => [id, opi2Funds[id] * businessRate])
   );
 
-  const commonWeightedHeadcount = headcounts.common * commonPayoutRate;
-  const equalWeightedHeadcount =
+  const commonWeightedHeadcount = headcounts.common * commonWeight;
+  const divisionWeightedHeadcount =
     headcounts.memory + headcounts.foundry + headcounts.slsi + commonWeightedHeadcount;
-  const equalBaseAverage = equalWeightedHeadcount > 0 ? equalPool / equalWeightedHeadcount : 0;
+  const divisionBaseAverage = divisionWeightedHeadcount > 0 ? divisionPool / divisionWeightedHeadcount : 0;
 
   const businessWeightedHeadcounts = Object.fromEntries(
     BUSINESS_DIVISION_IDS.map((id) => [
@@ -302,7 +302,7 @@ function calculate(input) {
       id,
       name: getDivisionName(id),
       opi1: averageSalary * opi1Rate,
-      opi2Equal: equalBaseAverage,
+      opi2Division: divisionBaseAverage,
       opi2Business: businessBaseAverage[id],
     };
   });
@@ -312,17 +312,17 @@ function calculate(input) {
     id: "common",
     name: getDivisionName("common"),
     opi1: averageSalary * opi1Rate,
-    opi2Equal: equalBaseAverage * commonPayoutRate,
-    opi2Business: selectedBusinessBaseAverage * commonPayoutRate,
+    opi2Division: divisionBaseAverage * commonWeight,
+    opi2Business: selectedBusinessBaseAverage * commonWeight,
   };
 
   const userResults = Object.fromEntries(
     ALL_DIVISION_IDS.map((id) => {
       const averageResult = averageResults[id];
       const opi1 = salary * opi1Rate;
-      const opi2Equal = averageResult.opi2Equal * salaryRatio;
+      const opi2Division = averageResult.opi2Division * salaryRatio;
       const opi2Business = averageResult.opi2Business * salaryRatio;
-      const opi2Total = opi2Equal + opi2Business;
+      const opi2Total = opi2Division + opi2Business;
       const totalBonus = opi1 + opi2Total;
       const totalCompensation = salary + totalBonus;
 
@@ -331,7 +331,7 @@ function calculate(input) {
         {
           ...averageResult,
           opi1,
-          opi2Equal,
+          opi2Division,
           opi2Business,
           opi2Total,
           totalBonus,
@@ -342,7 +342,7 @@ function calculate(input) {
   );
 
   const estimatedAverageOpi2Payout =
-    equalBaseAverage * equalWeightedHeadcount +
+    divisionBaseAverage * divisionWeightedHeadcount +
     BUSINESS_DIVISION_IDS.reduce((sum, id) => sum + businessBaseAverage[id] * businessWeightedHeadcounts[id], 0);
 
   return {
@@ -351,12 +351,12 @@ function calculate(input) {
     salaryRatio,
     opi2Funds,
     totalOpi2Fund,
-    equalPool,
+    divisionPool,
     businessPools,
     commonWeightedHeadcount,
-    equalWeightedHeadcount,
+    divisionWeightedHeadcount,
     businessWeightedHeadcounts,
-    equalBaseAverage,
+    divisionBaseAverage,
     businessBaseAverage,
     estimatedAverageOpi2Payout,
     results: userResults,
@@ -367,15 +367,18 @@ function render() {
   const result = calculate(state);
   const selected = result.results[state.userDivision];
   const selectedName = getDivisionName(state.userDivision);
+  const sourceName = getDivisionName(state.commonBusinessPoolSource);
 
   elements.selectedDivisionTitle.textContent = `${selectedName} 기준 예상 성과급`;
   elements.salaryRatioText.textContent = `연봉 보정계수 ${formatDecimal(result.salaryRatio, 2)}배`;
+  elements.commonSourceHelp.textContent = `현재 공통은 ${sourceName} 제원을 공유하고 ${formatDecimal(state.commonPayoutRatePercent, 1)}% 가중치로 계산됩니다.`;
 
   elements.summaryCards.innerHTML = [
-    summaryCard("OPI1", selected.opi1, "본인 연봉 × OPI1 비율"),
-    summaryCard("OPI2 균등분", selected.opi2Equal, "전체 재원 40%를 가중인원으로 배분"),
-    summaryCard("OPI2 사업부별분", selected.opi2Business, "사업부별 재원 60%를 가중인원으로 배분"),
-    summaryCard("총 성과급", selected.totalBonus, "OPI1 + OPI2", true),
+    summaryCard("OPI1", selected.opi1, formatSalaryPercent(selected.opi1, result.salary)),
+    summaryCard("OPI2 부문", selected.opi2Division, `${formatSalaryPercent(selected.opi2Division, result.salary)} · 전체 재원 ${formatDecimal(state.equalDistributionRatePercent, 1)}%`),
+    summaryCard("OPI2 사업부", selected.opi2Business, `${formatSalaryPercent(selected.opi2Business, result.salary)} · 사업부 재원 ${formatDecimal(state.businessDistributionRatePercent, 1)}%`),
+    summaryCard("OPI2 합계", selected.opi2Total, formatSalaryPercent(selected.opi2Total, result.salary)),
+    summaryCard("총 성과급", selected.totalBonus, formatSalaryPercent(selected.totalBonus, result.salary), true),
     summaryCard("예상 총보상", selected.totalCompensation, "연봉 + 총 성과급"),
   ].join("");
 
@@ -386,7 +389,7 @@ function render() {
   const distributionTotal = state.equalDistributionRatePercent + state.businessDistributionRatePercent;
   if (Math.abs(distributionTotal - 100) > 0.001) {
     elements.distributionWarning.hidden = false;
-    elements.distributionWarning.textContent = `현재 균등배분 + 사업부별 배분 비율 합계가 ${formatDecimal(distributionTotal, 1)}%입니다. 일반적으로 100%가 되도록 입력하세요.`;
+    elements.distributionWarning.textContent = `현재 부문 배분 + 사업부 배분 비율 합계가 ${formatDecimal(distributionTotal, 1)}%입니다. 일반적으로 100%가 되도록 입력하세요.`;
   } else {
     elements.distributionWarning.hidden = true;
   }
@@ -396,13 +399,13 @@ function render() {
     const selectedClass = id === state.userDivision ? " class=\"selected-row\"" : "";
     return `
       <tr${selectedClass}>
-        <th>${row.name}${id === state.userDivision ? " <span class=\"muted-pill\">선택</span>" : ""}</th>
-        <td>${formatMoney(row.opi1)}</td>
-        <td>${formatMoney(row.opi2Equal)}</td>
-        <td>${formatMoney(row.opi2Business)}</td>
-        <td>${formatMoney(row.opi2Total)}</td>
-        <td><strong>${formatMoney(row.totalBonus)}</strong></td>
-        <td>${formatMoney(row.totalCompensation)}</td>
+        <th data-label="사업부">${row.name}${id === state.userDivision ? " <span class=\"muted-pill\">선택</span>" : ""}</th>
+        <td data-label="OPI1">${formatMoney(row.opi1)}</td>
+        <td data-label="OPI2 부문">${formatMoney(row.opi2Division)}</td>
+        <td data-label="OPI2 사업부">${formatMoney(row.opi2Business)}</td>
+        <td data-label="OPI2 합계">${formatMoney(row.opi2Total)}</td>
+        <td data-label="총 성과급"><strong>${formatMoney(row.totalBonus)}</strong></td>
+        <td data-label="예상 총보상">${formatMoney(row.totalCompensation)}</td>
       </tr>
     `;
   }).join("");
@@ -448,14 +451,14 @@ function renderFundSummary(result) {
 
   const stats = [
     ["전체 OPI2 재원", formatMoney(result.totalOpi2Fund)],
-    ["균등배분 재원", formatMoney(result.equalPool)],
-    ["메모리 사업부별 배분 재원", formatMoney(result.businessPools.memory)],
-    ["파운드리 사업부별 배분 재원", formatMoney(result.businessPools.foundry)],
-    ["S.LSI 사업부별 배분 재원", formatMoney(result.businessPools.slsi)],
+    ["OPI2 부문 재원", formatMoney(result.divisionPool)],
+    ["메모리 사업부 재원", formatMoney(result.businessPools.memory)],
+    ["파운드리 사업부 재원", formatMoney(result.businessPools.foundry)],
+    ["S.LSI 사업부 재원", formatMoney(result.businessPools.slsi)],
     ["공통 가중인원", `${formatDecimal(result.commonWeightedHeadcount, 1)}명`],
-    ["균등배분 가중인원", `${formatDecimal(result.equalWeightedHeadcount, 1)}명`],
-    [`${sourceName} 사업부별 가중인원`, `${formatDecimal(selectedBusinessWeighted, 1)}명`],
-    ["평균연봉 기준 지급액 검증", `${formatMoney(result.estimatedAverageOpi2Payout)} 지급`],
+    ["부문 가중인원", `${formatDecimal(result.divisionWeightedHeadcount, 1)}명`],
+    [`${sourceName} 사업부 가중인원`, `${formatDecimal(selectedBusinessWeighted, 1)}명`],
+    ["평균연봉 기준 OPI2 지급 검증", `${formatMoney(result.estimatedAverageOpi2Payout)} 지급`],
     ["재원 잔액", formatMoney(Math.abs(fundGap) < 1 ? 0 : fundGap)],
   ];
 
@@ -507,18 +510,15 @@ function onInputChange(event) {
   readInputs();
 
   if (event?.target?.id === "equalDistributionRatePercent") {
-    lastChangedDistribution = "equal";
     state.businessDistributionRatePercent = clamp(100 - state.equalDistributionRatePercent, 0, 100);
-    elements.businessDistributionRatePercent.value = state.businessDistributionRatePercent;
   }
 
   if (event?.target?.id === "businessDistributionRatePercent") {
-    lastChangedDistribution = "business";
     state.equalDistributionRatePercent = clamp(100 - state.businessDistributionRatePercent, 0, 100);
-    elements.equalDistributionRatePercent.value = state.equalDistributionRatePercent;
   }
 
   state = sanitizeState(state);
+  syncInputs();
   saveState();
   updateUrlSilently();
   render();
