@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2026 삼성전자 성과급 계산기</title>
+    <meta
+      name="description"
+      content="2026 삼성전자 OPI1/OPI2 성과급 가정 시뮬레이터. 사업부별 영업이익, 인원, 공통 배분율을 수정해 계산할 수 있습니다."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">가정 기반 시뮬레이터</p>
+          <h1>2026 삼성전자 성과급 계산기</h1>
+          <p class="hero-copy">
+            OPI1은 연봉 비례, OPI2는 영업이익 재원과 가중인원 방식으로 계산합니다.
+            공통조직은 선택한 사업부의 사업부별 배분 재원에 <strong>공통 인원 × 배분율</strong>로 포함됩니다.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="secondary" id="shareButton">현재 설정 링크 복사</button>
+          <button type="button" class="secondary" id="resetButton">기본값 복원</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="notice" aria-label="주의사항">
+          <strong>주의:</strong> 이 사이트는 사용자가 입력한 가정값으로 계산하는 비공식 계산기입니다.
+          실제 회사의 성과급 제도, 지급률, 지급 대상, 기준 연봉, 세금 및 개인별 평가 결과와 다를 수 있습니다.
+        </section>
+
+        <section class="section result-highlight" aria-label="내 예상 결과">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">내 결과</p>
+              <h2 id="selectedDivisionTitle">메모리 기준 예상 성과급</h2>
+            </div>
+            <p class="small-muted" id="salaryRatioText">연봉 보정계수 1.00배</p>
+          </div>
+          <div class="summary-grid" id="summaryCards"></div>
+        </section>
+
+        <section class="layout-grid">
+          <div class="section">
+            <div class="section-title-row">
+              <div>
+                <p class="eyebrow">개인 조건</p>
+                <h2>내 연봉과 사업부</h2>
+              </div>
+            </div>
+
+            <div class="form-grid two-cols">
+              <label class="field">
+                <span>본인 연봉</span>
+                <div class="input-with-unit">
+                  <input type="number" min="0" step="100" id="userSalaryManwon" />
+                  <em>만원</em>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>본인 사업부</span>
+                <select id="userDivision">
+                  <option value="memory">메모리</option>
+                  <option value="common">공통</option>
+                  <option value="foundry">파운드리</option>
+                  <option value="slsi">S.LSI</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>평균연봉</span>
+                <div class="input-with-unit">
+                  <input type="number" min="1" step="100" id="averageSalaryManwon" />
+                  <em>만원</em>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title-row">
+              <div>
+                <p class="eyebrow">OPI 조건</p>
+                <h2>지급률 설정</h2>
+              </div>
+            </div>
+
+            <div class="form-grid two-cols">
+              <label class="field">
+                <span>OPI1 비율</span>
+                <div class="input-with-unit">
+                  <input type="number" min="0" step="1" id="opi1RatePercent" />
+                  <em>%</em>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>OPI2 재원 비율</span>
+                <div class="input-with-unit">
+                  <input type="number" min="0" step="0.1" id="opi2FundingRatePercent" />
+                  <em>%</em>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>균등배분 비율</span>
+                <div class="input-with-unit">
+                  <input type="number" min="0" max="100" step="1" id="equalDistributionRatePercent" />
+                  <em>%</em>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>사업부별 배분 비율</span>
+                <div class="input-with-unit">
+                  <input type="number" min="0" max="100" step="1" id="businessDistributionRatePercent" />
+                  <em>%</em>
+                </div>
+              </label>
+            </div>
+            <p class="warning" id="distributionWarning" hidden></p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">사업부별 가정</p>
+              <h2>영업이익과 인력 구성</h2>
+            </div>
+            <p class="small-muted">영업이익 단위는 조 원, 연봉 단위는 만 원입니다.</p>
+          </div>
+
+          <div class="responsive-table-wrap">
+            <table class="input-table">
+              <thead>
+                <tr>
+                  <th>사업부</th>
+                  <th>영업이익</th>
+                  <th>인원 수</th>
+                  <th>OPI2 재원</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>메모리</th>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" step="1" id="memoryProfitJo" />
+                      <em>조</em>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" min="0" step="100" id="memoryHeadcount" />
+                      <em>명</em>
+                    </div>
+                  </td>
+                  <td id="memoryFundText">-</td>
+                </tr>
+                <tr>
+                  <th>파운드리</th>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" step="1" id="foundryProfitJo" />
+                      <em>조</em>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" min="0" step="100" id="foundryHeadcount" />
+                      <em>명</em>
+                    </div>
+                  </td>
+                  <td id="foundryFundText">-</td>
+                </tr>
+                <tr>
+                  <th>S.LSI</th>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" step="1" id="slsiProfitJo" />
+                      <em>조</em>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" min="0" step="100" id="slsiHeadcount" />
+                      <em>명</em>
+                    </div>
+                  </td>
+                  <td id="slsiFundText">-</td>
+                </tr>
+                <tr>
+                  <th>공통</th>
+                  <td><span class="muted-pill">직접 재원 없음</span></td>
+                  <td>
+                    <div class="input-with-unit compact">
+                      <input type="number" min="0" step="100" id="commonHeadcount" />
+                      <em>명</em>
+                    </div>
+                  </td>
+                  <td><span class="muted-pill">가중인원으로 반영</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section common-panel">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">공통 OPI2 설정</p>
+              <h2>가중인원 기반 재원보존형</h2>
+            </div>
+          </div>
+
+          <div class="form-grid two-cols">
+            <label class="field">
+              <span>공통 배분율</span>
+              <div class="input-with-unit">
+                <input type="number" min="0" max="100" step="1" id="commonPayoutRatePercent" />
+                <em>%</em>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>공통 사업부별 배분 재원</span>
+              <select id="commonBusinessPoolSource">
+                <option value="memory">메모리</option>
+                <option value="foundry">파운드리</option>
+                <option value="slsi">S.LSI</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="formula-box">
+            <p>
+              균등배분분은 <strong>전체 OPI2 균등배분 재원 ÷ 전체 가중인원</strong>으로 계산합니다.
+              전체 가중인원은 일반 사업부 인원과 <strong>공통 인원 × 공통 배분율</strong>을 더한 값입니다.
+            </p>
+            <p>
+              사업부별 배분분은 선택한 사업부의 배분 대상 인원에 <strong>공통 인원 × 공통 배분율</strong>을 더해 계산합니다.
+              공통은 선택 사업부 기준금액의 배분율만큼 받습니다.
+            </p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">전체 결과</p>
+              <h2>사업부별 예상 성과급 비교</h2>
+            </div>
+            <p class="small-muted">아래 표는 현재 입력한 본인 연봉 기준입니다.</p>
+          </div>
+
+          <div class="responsive-table-wrap">
+            <table class="result-table">
+              <thead>
+                <tr>
+                  <th>사업부</th>
+                  <th>OPI1</th>
+                  <th>OPI2 균등분</th>
+                  <th>OPI2 사업부별분</th>
+                  <th>OPI2 합계</th>
+                  <th>총 성과급</th>
+                  <th>예상 총보상</th>
+                </tr>
+              </thead>
+              <tbody id="resultTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="layout-grid">
+          <div class="section">
+            <div class="section-title-row">
+              <div>
+                <p class="eyebrow">시각화</p>
+                <h2>사업부별 총 성과급</h2>
+              </div>
+            </div>
+            <div class="bar-chart" id="bonusChart"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title-row">
+              <div>
+                <p class="eyebrow">계산 검증</p>
+                <h2>OPI2 재원 요약</h2>
+              </div>
+            </div>
+            <div class="stats-list" id="fundSummary"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">계산식</p>
+              <h2>적용한 공식</h2>
+            </div>
+          </div>
+          <ol class="formula-list">
+            <li>OPI1 = 본인 연봉 × OPI1 비율</li>
+            <li>사업부별 OPI2 재원 = max(사업부별 영업이익, 0) × OPI2 재원 비율</li>
+            <li>OPI2 균등배분 재원 = 전체 OPI2 재원 × 균등배분 비율</li>
+            <li>균등배분 가중인원 = 메모리 + 파운드리 + S.LSI + 공통 인원 × 공통 배분율</li>
+            <li>일반 사업부 균등분 = OPI2 균등배분 재원 ÷ 균등배분 가중인원</li>
+            <li>공통 균등분 = 일반 사업부 균등분 × 공통 배분율</li>
+            <li>사업부별 배분 재원 = 각 사업부 OPI2 재원 × 사업부별 배분 비율</li>
+            <li>선택 사업부의 사업부별 배분 가중인원 = 선택 사업부 인원 + 공통 인원 × 공통 배분율</li>
+            <li>공통 사업부별 배분분 = 선택 사업부의 사업부별 기준금액 × 공통 배분율</li>
+            <li>본인 OPI2 = 평균연봉 기준 OPI2 × 본인 연봉 ÷ 평균연봉</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>
+        <p>© 2026 Bonus Simulator. Static GitHub Pages app.</p>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
