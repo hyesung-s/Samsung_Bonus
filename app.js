@@ -52,14 +52,12 @@ const elements = {
   summaryCards: document.getElementById("summaryCards"),
   selectedDivisionTitle: document.getElementById("selectedDivisionTitle"),
   salaryRatioText: document.getElementById("salaryRatioText"),
-  resultTableBody: document.getElementById("resultTableBody"),
-  bonusChart: document.getElementById("bonusChart"),
+  bonusComparison: document.getElementById("bonusComparison"),
   fundSummary: document.getElementById("fundSummary"),
   distributionWarning: document.getElementById("distributionWarning"),
   memoryFundText: document.getElementById("memoryFundText"),
   foundryFundText: document.getElementById("foundryFundText"),
   slsiFundText: document.getElementById("slsiFundText"),
-  commonSourceHelp: document.getElementById("commonSourceHelp"),
   shareButton: document.getElementById("shareButton"),
   resetButton: document.getElementById("resetButton"),
   toast: document.getElementById("toast"),
@@ -90,7 +88,8 @@ function formatMoney(value) {
   const abs = Math.abs(value);
 
   if (abs >= JO_WON) {
-    return `${sign}${formatDecimal(abs / JO_WON, 2)}조 원`;
+    const jo = abs / JO_WON;
+    return `${sign}${formatDecimal(jo, 2)}조 원`;
   }
 
   const eok = Math.floor(abs / 100_000_000);
@@ -102,9 +101,13 @@ function formatMoney(value) {
   return "0원";
 }
 
-function formatSalaryPercent(value, salary) {
-  if (!Number.isFinite(value) || !Number.isFinite(salary) || salary <= 0) return "연봉 대비 -";
-  return `연봉 대비 ${formatDecimal((value / salary) * 100, 1)}%`;
+function formatPercent(value, maxDigits = 1) {
+  return `${formatDecimal(value, maxDigits)}%`;
+}
+
+function percentOfSalary(value, salary) {
+  if (!salary || !Number.isFinite(value)) return "-";
+  return formatPercent((value / salary) * 100, 1);
 }
 
 function getDivisionName(id) {
@@ -367,19 +370,16 @@ function render() {
   const result = calculate(state);
   const selected = result.results[state.userDivision];
   const selectedName = getDivisionName(state.userDivision);
-  const sourceName = getDivisionName(state.commonBusinessPoolSource);
 
   elements.selectedDivisionTitle.textContent = `${selectedName} 기준 예상 성과급`;
   elements.salaryRatioText.textContent = `연봉 보정계수 ${formatDecimal(result.salaryRatio, 2)}배`;
-  elements.commonSourceHelp.textContent = `현재 공통은 ${sourceName} 제원을 공유하고 ${formatDecimal(state.commonPayoutRatePercent, 1)}% 가중치로 계산됩니다.`;
 
   elements.summaryCards.innerHTML = [
-    summaryCard("OPI1", selected.opi1, formatSalaryPercent(selected.opi1, result.salary)),
-    summaryCard("OPI2 부문", selected.opi2Division, `${formatSalaryPercent(selected.opi2Division, result.salary)} · 전체 재원 ${formatDecimal(state.equalDistributionRatePercent, 1)}%`),
-    summaryCard("OPI2 사업부", selected.opi2Business, `${formatSalaryPercent(selected.opi2Business, result.salary)} · 사업부 재원 ${formatDecimal(state.businessDistributionRatePercent, 1)}%`),
-    summaryCard("OPI2 합계", selected.opi2Total, formatSalaryPercent(selected.opi2Total, result.salary)),
-    summaryCard("총 성과급", selected.totalBonus, formatSalaryPercent(selected.totalBonus, result.salary), true),
-    summaryCard("예상 총보상", selected.totalCompensation, "연봉 + 총 성과급"),
+    summaryCard("OPI1", selected.opi1, result.salary, "본인 연봉 × OPI1 비율"),
+    summaryCard("OPI2 부문", selected.opi2Division, result.salary, "전체 OPI2 재원 중 부문 배분"),
+    summaryCard("OPI2 사업부", selected.opi2Business, result.salary, "사업부 OPI2 재원 중 사업부 배분"),
+    summaryCard("OPI2 합계", selected.opi2Total, result.salary, "OPI2 부문 + OPI2 사업부"),
+    summaryCard("총 성과급", selected.totalBonus, result.salary, "OPI1 + OPI2", true),
   ].join("");
 
   elements.memoryFundText.textContent = formatMoney(result.opi2Funds.memory);
@@ -389,59 +389,79 @@ function render() {
   const distributionTotal = state.equalDistributionRatePercent + state.businessDistributionRatePercent;
   if (Math.abs(distributionTotal - 100) > 0.001) {
     elements.distributionWarning.hidden = false;
-    elements.distributionWarning.textContent = `현재 부문 배분 + 사업부 배분 비율 합계가 ${formatDecimal(distributionTotal, 1)}%입니다. 일반적으로 100%가 되도록 입력하세요.`;
+    elements.distributionWarning.textContent = `현재 부문 + 사업부 배분 비율 합계가 ${formatDecimal(distributionTotal, 1)}%입니다. 일반적으로 100%가 되도록 입력하세요.`;
   } else {
     elements.distributionWarning.hidden = true;
   }
 
-  elements.resultTableBody.innerHTML = ALL_DIVISION_IDS.map((id) => {
-    const row = result.results[id];
-    const selectedClass = id === state.userDivision ? " class=\"selected-row\"" : "";
-    return `
-      <tr${selectedClass}>
-        <th data-label="사업부">${row.name}${id === state.userDivision ? " <span class=\"muted-pill\">선택</span>" : ""}</th>
-        <td data-label="OPI1">${formatMoney(row.opi1)}</td>
-        <td data-label="OPI2 부문">${formatMoney(row.opi2Division)}</td>
-        <td data-label="OPI2 사업부">${formatMoney(row.opi2Business)}</td>
-        <td data-label="OPI2 합계">${formatMoney(row.opi2Total)}</td>
-        <td data-label="총 성과급"><strong>${formatMoney(row.totalBonus)}</strong></td>
-        <td data-label="예상 총보상">${formatMoney(row.totalCompensation)}</td>
-      </tr>
-    `;
-  }).join("");
-
-  renderChart(result);
+  renderBonusComparison(result);
   renderFundSummary(result);
 }
 
-function summaryCard(label, value, sub, primary = false) {
+function summaryCard(label, value, salary, sub, primary = false) {
   return `
     <article class="summary-card ${primary ? "primary-card" : ""}">
       <div class="label">${label}</div>
       <div class="value">${formatMoney(value)}</div>
+      <div class="ratio">연봉 대비 ${percentOfSalary(value, salary)}</div>
       <div class="sub">${sub}</div>
     </article>
   `;
 }
 
-function renderChart(result) {
-  const rows = ALL_DIVISION_IDS.map((id) => result.results[id]);
-  const max = Math.max(...rows.map((row) => row.totalBonus), 1);
+function renderBonusComparison(result) {
+  const metricDefs = [
+    { key: "opi1", label: "OPI1" },
+    { key: "opi2Division", label: "OPI2 부문" },
+    { key: "opi2Business", label: "OPI2 사업부" },
+    { key: "opi2Total", label: "OPI2 합계" },
+    { key: "totalBonus", label: "총 성과급" },
+  ];
 
-  elements.bonusChart.innerHTML = rows.map((row) => {
-    const width = Math.max(2, (row.totalBonus / max) * 100);
+  const rows = ALL_DIVISION_IDS.map((id) => result.results[id]);
+  const maxByMetric = Object.fromEntries(
+    metricDefs.map((metric) => [
+      metric.key,
+      Math.max(...rows.map((row) => Math.max(row[metric.key], 0)), 1),
+    ])
+  );
+
+  const header = `
+    <div class="comparison-header" aria-hidden="true">
+      <div>사업부</div>
+      ${metricDefs.map((metric) => `<div>${metric.label}</div>`).join("")}
+    </div>
+  `;
+
+  const body = rows.map((row) => {
+    const selectedClass = row.id === state.userDivision ? " selected-comparison-row" : "";
+    const metricCells = metricDefs.map((metric) => {
+      const value = row[metric.key];
+      const width = Math.max(1.5, (Math.max(value, 0) / maxByMetric[metric.key]) * 100);
+      return `
+        <div class="metric-cell">
+          <div class="metric-mobile-label">${metric.label}</div>
+          <div class="metric-value">${formatMoney(value)}</div>
+          <div class="metric-ratio">연봉 대비 ${percentOfSalary(value, result.salary)}</div>
+          <div class="mini-track" aria-hidden="true">
+            <div class="mini-fill" style="width: ${width}%"></div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
     return `
-      <div class="bar-row">
-        <div class="bar-head">
-          <span>${row.name}</span>
-          <span>${formatMoney(row.totalBonus)}</span>
+      <article class="comparison-row${selectedClass}">
+        <div class="division-cell">
+          <div class="division-name">${row.name}${row.id === state.userDivision ? " <span class=\"muted-pill\">선택</span>" : ""}</div>
+          <div class="division-total">총보상 ${formatMoney(row.totalCompensation)}</div>
         </div>
-        <div class="bar-track" aria-hidden="true">
-          <div class="bar-fill" style="width: ${width}%"></div>
-        </div>
-      </div>
+        ${metricCells}
+      </article>
     `;
   }).join("");
+
+  elements.bonusComparison.innerHTML = header + body;
 }
 
 function renderFundSummary(result) {
@@ -452,13 +472,13 @@ function renderFundSummary(result) {
   const stats = [
     ["전체 OPI2 재원", formatMoney(result.totalOpi2Fund)],
     ["OPI2 부문 재원", formatMoney(result.divisionPool)],
-    ["메모리 사업부 재원", formatMoney(result.businessPools.memory)],
-    ["파운드리 사업부 재원", formatMoney(result.businessPools.foundry)],
-    ["S.LSI 사업부 재원", formatMoney(result.businessPools.slsi)],
+    ["메모리 OPI2 사업부 재원", formatMoney(result.businessPools.memory)],
+    ["파운드리 OPI2 사업부 재원", formatMoney(result.businessPools.foundry)],
+    ["S.LSI OPI2 사업부 재원", formatMoney(result.businessPools.slsi)],
     ["공통 가중인원", `${formatDecimal(result.commonWeightedHeadcount, 1)}명`],
-    ["부문 가중인원", `${formatDecimal(result.divisionWeightedHeadcount, 1)}명`],
-    [`${sourceName} 사업부 가중인원`, `${formatDecimal(selectedBusinessWeighted, 1)}명`],
-    ["평균연봉 기준 OPI2 지급 검증", `${formatMoney(result.estimatedAverageOpi2Payout)} 지급`],
+    ["부문 배분 가중인원", `${formatDecimal(result.divisionWeightedHeadcount, 1)}명`],
+    [`${sourceName} 사업부 배분 가중인원`, `${formatDecimal(selectedBusinessWeighted, 1)}명`],
+    ["평균연봉 기준 OPI2 지급액 검증", `${formatMoney(result.estimatedAverageOpi2Payout)} 지급`],
     ["재원 잔액", formatMoney(Math.abs(fundGap) < 1 ? 0 : fundGap)],
   ];
 
@@ -511,14 +531,15 @@ function onInputChange(event) {
 
   if (event?.target?.id === "equalDistributionRatePercent") {
     state.businessDistributionRatePercent = clamp(100 - state.equalDistributionRatePercent, 0, 100);
+    elements.businessDistributionRatePercent.value = state.businessDistributionRatePercent;
   }
 
   if (event?.target?.id === "businessDistributionRatePercent") {
     state.equalDistributionRatePercent = clamp(100 - state.businessDistributionRatePercent, 0, 100);
+    elements.equalDistributionRatePercent.value = state.equalDistributionRatePercent;
   }
 
   state = sanitizeState(state);
-  syncInputs();
   saveState();
   updateUrlSilently();
   render();
