@@ -18,7 +18,7 @@
   const HEALTH_INSURANCE_RATE = 0.03595;
   const LONG_TERM_CARE_RATE = 0.1314;
   const EMPLOYMENT_INSURANCE_RATE = 0.009;
-  const STORAGE_KEY = "samsung-bonus-calculator-state-v22-myresult-monthly-net";
+  const STORAGE_KEY = "samsung-bonus-calculator-state-v23-index-refreshed";
   const SAMPSUNG_URL = "https://sampsung.vercel.app/";
   const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/005930.KS?range=10d&interval=1d";
 

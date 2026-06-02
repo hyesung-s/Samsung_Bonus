@@ -4,6 +4,8 @@
 
 # 2026 삼성전자 성과급 계산기
 
+> v23-index-refreshed: index.html 및 app.js 모두 최신 버전으로 갱신. 내 결과에 내년도 월별 실수령액 포함.
+
 정적 HTML/CSS/JavaScript만으로 동작하는 2026 삼성전자 성과급 시뮬레이터입니다. GitHub Pages에 그대로 업로드해 사용할 수 있습니다.
 
 ## 포함 기능
