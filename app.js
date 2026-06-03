@@ -18,7 +18,7 @@
   const HEALTH_INSURANCE_RATE = 0.03595;
   const LONG_TERM_CARE_RATE = 0.1314;
   const EMPLOYMENT_INSURANCE_RATE = 0.009;
-  const STORAGE_KEY = "samsung-bonus-calculator-state-v25-2027-monthly-net";
+  const STORAGE_KEY = "samsung-bonus-calculator-state-v26-monthly-net-details";
   const SAMPSUNG_URL = "https://sampsung.vercel.app/";
   const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/005930.KS?range=10d&interval=1d";
 
@@ -209,7 +209,7 @@
       longTermCareAnnual +
       nationalPensionAnnual +
       employmentInsuranceAnnual;
-    const annualNet = Math.max(0, salaryIncome - totalDeductions);
+    const annualNet = salaryIncome - totalDeductions;
     return {
       annualGross: salaryIncome,
       salaryIncome,
@@ -577,6 +577,48 @@
     `;
   }
 
+  function monthlyTakeHomeDetailsHtml(monthlyTakeHome, options = {}) {
+    const compact = options.compact ? " compact" : "";
+    const rows = [
+      ["2027년 연봉", monthlyTakeHome.salaryIncome],
+      ["근로소득세", -monthlyTakeHome.earnedIncomeTax],
+      ["지방소득세", -monthlyTakeHome.localIncomeTax],
+      ["건강보험료", -monthlyTakeHome.healthInsuranceAnnual],
+      ["장기요양료", -monthlyTakeHome.longTermCareAnnual],
+      ["국민연금 보험료", -monthlyTakeHome.nationalPensionAnnual],
+      ["고용보험료", -monthlyTakeHome.employmentInsuranceAnnual],
+      ["공제 합계", -monthlyTakeHome.totalDeductions],
+      ["실수령액", monthlyTakeHome.annualNet],
+    ];
+
+    return `
+      <details class="net-details${compact}">
+        <summary>세부 공제 보기</summary>
+        <div class="net-detail-note">
+          소득세는 2027년 연봉 기준, 보험료는 2026년 총소득 ${formatEok(monthlyTakeHome.insuranceBasisIncome)} 기준입니다.
+        </div>
+        <table class="net-detail-table">
+          <thead>
+            <tr>
+              <th>항목</th>
+              <th>연간</th>
+              <th>월간</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(([label, annual]) => `
+              <tr>
+                <th>${label}</th>
+                <td>${formatManwonFromWon(annual)}</td>
+                <td>${formatManwonFromWon(annual / 12)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </details>
+    `;
+  }
+
   function finalReceiptHtml(result) {
     const receipt = result.selectedReceipt;
     return `
@@ -629,8 +671,11 @@
       },
       {
         label: "내년도 월별 실수령액",
-        html: `<div class="single-money">${formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet)}</div>`,
-        sub: `2027 연봉 ${formatManwonFromWon(receipt.monthlyTakeHome.salaryIncome)} 기준 · 보험료 2026 총소득 ${formatEok(receipt.monthlyTakeHome.insuranceBasisIncome)} 기준`,
+        html: `
+          <div class="single-money">${formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet)}</div>
+          ${monthlyTakeHomeDetailsHtml(receipt.monthlyTakeHome)}
+        `,
+        sub: `연간 실수령액 ${formatManwonFromWon(receipt.monthlyTakeHome.annualNet)} · 마이너스 가능`,
         cardClass: "monthly-net-card",
       },
     ];
@@ -653,7 +698,7 @@
         OPI2 자사주는 1/3 즉시 매도 가능, 1/3 1년 뒤, 1/3 2년 뒤 매도 가능으로 나누며,
         나머지 주식은 2년 뒤 매도 가능 구간에 포함했습니다. 세후 최종 수령액은 OPI1 세후 현금과 최근 삼성전자 종가 기준 OPI2 자사주 평가액의 합계입니다.
         세후액은 근로소득공제·세액공제·비과세 항목을 반영하지 않은 간이 계산입니다.
-        내년도 월별 실수령액은 2027년 연봉에서 연봉 기준 근로소득세와 지방소득세를 차감하고, 건강보험료·장기요양료·국민연금 보험료·고용보험료는 2026년 총소득(연봉 + OPI1 + OPI2)을 기준으로 차감해 12개월로 나눈 값입니다.
+        내년도 월별 실수령액은 2027년 연봉에서 연봉 기준 근로소득세와 지방소득세를 차감하고, 건강보험료·장기요양료·국민연금 보험료·고용보험료는 2026년 총소득(연봉 + OPI1 + OPI2)을 기준으로 차감해 12개월로 나눈 값입니다. 공제액이 연봉보다 크면 월별 실수령액은 마이너스로 표시됩니다.
       `;
     }
   }
@@ -742,6 +787,7 @@
           <em>${metric.percentText ?? formatPercent(percent)}</em>
         </div>
         ${metric.note ? `<p class="metric-note">${metric.note}</p>` : ""}
+        ${metric.detailsHtml || ""}
         <div class="bar-track"><i style="--w: ${width}%"></i></div>
       </div>
     `;
@@ -793,7 +839,8 @@
           value: receipt.monthlyTakeHome.monthlyNet,
           display: formatManwonFromWon(receipt.monthlyTakeHome.monthlyNet),
           percentText: `연간 ${formatManwonFromWon(receipt.monthlyTakeHome.annualNet)}`,
-          note: `소득세 연봉 ${formatManwonFromWon(receipt.monthlyTakeHome.salaryIncome)} 기준 · 보험료 2026 총소득 ${formatEok(receipt.monthlyTakeHome.insuranceBasisIncome)} 기준`,
+          note: `소득세 연봉 기준 · 보험료 2026 총소득 기준 · 마이너스 가능`,
+          detailsHtml: monthlyTakeHomeDetailsHtml(receipt.monthlyTakeHome, { compact: true }),
         },
       ];
 

@@ -822,3 +822,98 @@ select {
     font-size: 15px;
   }
 }
+
+/* v26 monthly net detail disclosure */
+.net-details {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+.net-details summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 11px;
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 900;
+  background: #eef4ff;
+  user-select: none;
+}
+.net-details summary::-webkit-details-marker { display: none; }
+.net-details summary::after {
+  content: "펼치기";
+  float: right;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.net-details[open] summary::after { content: "접기"; }
+.net-detail-note {
+  padding: 9px 11px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.net-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.net-detail-table th,
+.net-detail-table td {
+  padding: 7px 9px;
+  border-top: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+.net-detail-table th:first-child,
+.net-detail-table td:first-child {
+  text-align: left;
+}
+.net-detail-table thead th {
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 900;
+}
+.net-detail-table tbody th {
+  color: #475569;
+  font-weight: 850;
+}
+.net-detail-table tbody tr:last-child th,
+.net-detail-table tbody tr:last-child td {
+  font-weight: 950;
+  color: #0f172a;
+  background: #fff;
+}
+.net-details.compact {
+  margin-top: 7px;
+  border-radius: 12px;
+}
+.net-details.compact summary {
+  padding: 7px 9px;
+  font-size: 12px;
+}
+.net-details.compact .net-detail-note {
+  padding: 7px 9px 0;
+  font-size: 11px;
+}
+.net-details.compact .net-detail-table {
+  font-size: 11px;
+}
+.net-details.compact .net-detail-table th,
+.net-details.compact .net-detail-table td {
+  padding: 6px 7px;
+}
+
+@media (max-width: 480px) {
+  .net-detail-table {
+    font-size: 11px;
+  }
+  .net-detail-table th,
+  .net-detail-table td {
+    padding: 6px 5px;
+  }
+}
